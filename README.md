@@ -2,7 +2,7 @@
 ### Análise completa de receita, estoque, inadimplência e segmentação de clientes de uma rede de locadoras | Mai–Ago 2005
 
 ![Status](https://img.shields.io/badge/status-concluído-brightgreen)
-![SQL](https://img.shields.io/badge/SQL-PostgreSQL-blue)
+![SQL](https://img.shields.io/badge/SQL-MySQL-blue)
 ![Dataset](https://img.shields.io/badge/dataset-DVD%20Rental-orange)
 ![Registros](https://img.shields.io/badge/registros-14.596%20aluguéis-lightgrey)
 ![Licença](https://img.shields.io/badge/licença-MIT-green)
