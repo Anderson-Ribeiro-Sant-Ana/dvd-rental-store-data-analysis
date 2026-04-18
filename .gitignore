@@ -1,0 +1,32 @@
+# Dados sensíveis e arquivos pesados
+data/raw/
+data/processed/
+*.tar
+*.zip
+*.dump
+*.backup
+
+# Credenciais e configurações locais
+.env
+*.env
+pgpass
+.pgpass
+connection_string.txt
+credentials.json
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs e editores
+.vscode/
+.idea/
+*.code-workspace
+
+# Arquivos temporários do PostgreSQL
+*.sql.bak
+*.sql.tmp
+
+# Logs
+*.log
