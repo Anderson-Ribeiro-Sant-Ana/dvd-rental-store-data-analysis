@@ -270,3 +270,97 @@ RESULTADO ESPERADO:
   - "01-02 dias": maior faixa de atraso (~25-30%)
   - "15+ dias": < 5% do total
 */
+
+
+-- ============================================================
+-- SEÇÃO 6: ESTIMATIVA DE PERDA DE RECEITA POR MULTAS NÃO CAPTURADAS
+-- Objetivo: Quantificar o potencial de receita não cobrado nos
+--           aluguéis devolvidos com atraso
+-- Hipótese: Milhares de dias-extra acumulados sem cobrança registrada
+--           representam oportunidade de receita incremental relevante
+--
+-- METODOLOGIA:
+--   O banco Sakila não possui tabela de multas. A estimativa usa
+--   a taxa diária proporcional: rental_rate / rental_duration.
+--   Exemplo: filme de $4.99 por 5 dias → $1.00/dia de multa estimada.
+--   Resultado deve ser interpretado como estimativa mínima conservadora.
+-- ============================================================
+
+SELECT
+    COUNT(r.rental_id)                                              AS total_alugueis_em_atraso,
+    SUM(GREATEST(0, DATEDIFF(r.return_date, r.rental_date)
+        - f.rental_duration))                                       AS total_dias_atraso,
+    -- Taxa diária estimada = valor do aluguel ÷ prazo contratado
+    ROUND(AVG(f.rental_rate / NULLIF(f.rental_duration, 0)), 4)    AS taxa_diaria_media_estimada,
+    -- Perda total estimada = soma de (dias_atraso × taxa_diaria) por aluguel
+    ROUND(SUM(
+        GREATEST(0, DATEDIFF(r.return_date, r.rental_date) - f.rental_duration)
+        * (f.rental_rate / NULLIF(f.rental_duration, 0))
+    ), 2)                                                           AS perda_estimada_total,
+    -- Perda média por aluguel em atraso
+    ROUND(SUM(
+        GREATEST(0, DATEDIFF(r.return_date, r.rental_date) - f.rental_duration)
+        * (f.rental_rate / NULLIF(f.rental_duration, 0))
+    ) / NULLIF(COUNT(r.rental_id), 0), 2)                          AS perda_media_por_aluguel_atrasado
+FROM rental r
+JOIN inventory i ON r.inventory_id = i.inventory_id
+JOIN film f      ON i.film_id      = f.film_id
+WHERE r.return_date IS NOT NULL
+  AND DATEDIFF(r.return_date, r.rental_date) > f.rental_duration;
+
+/*
+RESULTADO ESPERADO:
+  - total_alugueis_em_atraso: ~6.000-7.000 aluguéis
+  - total_dias_atraso: dezenas de milhares de dias acumulados
+  - perda_estimada_total: valor em dólares que representa receita potencial não cobrada
+
+INTERPRETAÇÃO:
+  - Este valor não é "dinheiro perdido" definitivamente — algumas multas podem
+    estar embutidas no payment.amount, mas não são distinguíveis
+  - É um indicador de oportunidade: implementar cobrança automatizada de multas
+    poderia capturar parte desse valor sem custo adicional de operação
+*/
+
+
+-- ============================================================
+-- SEÇÃO 7: PERDA ESTIMADA POR CATEGORIA DE FILME
+-- Objetivo: Identificar quais categorias concentram mais dias
+--           de atraso e maior perda estimada
+-- ============================================================
+
+SELECT
+    cat.name                                                         AS categoria,
+    COUNT(r.rental_id)                                               AS total_alugueis_atrasados,
+    SUM(GREATEST(0, DATEDIFF(r.return_date, r.rental_date)
+        - f.rental_duration))                                        AS total_dias_atraso,
+    ROUND(SUM(
+        GREATEST(0, DATEDIFF(r.return_date, r.rental_date) - f.rental_duration)
+        * (f.rental_rate / NULLIF(f.rental_duration, 0))
+    ), 2)                                                            AS perda_estimada,
+    RANK() OVER (
+        ORDER BY SUM(
+            GREATEST(0, DATEDIFF(r.return_date, r.rental_date) - f.rental_duration)
+            * (f.rental_rate / NULLIF(f.rental_duration, 0))
+        ) DESC
+    )                                                                AS rank_perda
+FROM rental r
+JOIN inventory i      ON r.inventory_id = i.inventory_id
+JOIN film f           ON i.film_id      = f.film_id
+JOIN film_category fc ON f.film_id      = fc.film_id
+JOIN category cat     ON fc.category_id = cat.category_id
+WHERE r.return_date IS NOT NULL
+  AND DATEDIFF(r.return_date, r.rental_date) > f.rental_duration
+GROUP BY cat.name
+ORDER BY perda_estimada DESC;
+
+/*
+RESULTADO ESPERADO:
+  - 16 linhas, uma por categoria
+  - Categorias com filmes de maior rental_rate devem liderar em perda estimada
+  - rank_perda = 1 indica a categoria com maior valor não cobrado
+
+INTERPRETAÇÃO:
+  - Categorias no topo são as mais prioritárias para implementação de multa
+  - Alta perda + alto rental_rate: clientes de títulos premium são os que mais
+    acumulam dias de atraso sem custo — impacto direto na receita potencial
+*/

@@ -1,10 +1,11 @@
-# DVD Rental Store — Análise de Desempenho Operacional e Comportamento de Clientes
-### Análise completa de receita, estoque, inadimplência e segmentação de clientes de uma rede de locadoras | Mai–Ago 2005
+# Sakila DVD Store — Análise Exploratória de Desempenho Operacional
+### Análise completa de receita, clientes, equipe, estoque e inadimplência de uma rede de locadoras | Mai–Ago 2005
 
 ![Status](https://img.shields.io/badge/status-concluído-brightgreen)
-![SQL](https://img.shields.io/badge/SQL-MySQL-blue)
-![Dataset](https://img.shields.io/badge/dataset-DVD%20Rental-orange)
+![SQL](https://img.shields.io/badge/SQL-MySQL%208.0-blue)
+![Dataset](https://img.shields.io/badge/dataset-Sakila-orange)
 ![Registros](https://img.shields.io/badge/registros-14.596%20aluguéis-lightgrey)
+![Plataforma](https://img.shields.io/badge/plataforma-MyGreatLearning-purple)
 ![Licença](https://img.shields.io/badge/licença-MIT-green)
 
 ---
@@ -29,17 +30,21 @@
 
 ## 🎯 Contexto e Problema de Negócio
 
-**Solicitante fictício:** Diretora de Operações de uma rede de locadoras de DVD com duas unidades físicas.
+**Origem:** Desafio prático proposto pela plataforma **MyGreatLearning** dentro de uma trilha de formação em análise de dados com SQL. O exercício utiliza o banco **Sakila** — banco de dados de exemplo oficial do MySQL — e propõe uma Análise Exploratória de Dados (EDA) para uma rede fictícia de locadoras de DVDs.
 
-**Contexto:** A rede enfrenta pressão de custos operacionais crescentes e busca maximizar a receita por m² de prateleira. A diretora precisa entender quais categorias de filme sustentam a receita, quais clientes concentram o maior valor, e onde o estoque está imobilizado sem giro — para tomar decisões de compra, precificação e retenção de clientes no próximo semestre.
+**Stakeholder fictício:** Diretora de Operações de uma rede com duas unidades físicas.
+
+**Contexto:** A rede busca maximizar receita, reduzir estoque imobilizado e entender o desempenho da equipe e dos clientes. A diretora precisa de uma visão consolidada para tomar decisões de compra, precificação, gestão de pessoal e retenção de clientes no próximo semestre.
 
 **O que esta análise deve responder:**
 
-- Quais categorias e títulos geram a maior parte da receita?
+- Quais categorias e filmes geram mais receita e volume de aluguéis?
 - Quais clientes têm maior valor e frequência de aluguel?
-- Há padrões de atraso que representam risco operacional?
-- Como a receita evoluiu ao longo do período disponível?
+- Como cada colaborador contribui para a receita da operação?
+- Há padrões de atraso e qual a perda estimada por multas não capturadas?
+- Como a receita evoluiu ao longo do tempo?
 - Existe diferença relevante de desempenho entre as duas lojas?
+- Onde o estoque está imobilizado sem retorno?
 
 ---
 
@@ -50,10 +55,11 @@
 | 1 | Quais categorias de filme geram mais receita e têm maior volume de aluguéis? | `02_business_analysis.sql` | ✅ |
 | 2 | Quais são os filmes mais alugados e quais ficam parados no estoque sem movimentação? | `02_business_analysis.sql` | ✅ |
 | 3 | Qual o perfil dos clientes mais valiosos (maior receita gerada) e com que frequência alugam? | `03_customer_behavior.sql` | ✅ |
-| 4 | Existe algum padrão de inadimplência — clientes que retornam filmes com atraso com frequência? | `03_customer_behavior.sql` | ✅ |
+| 4 | Existe algum padrão de inadimplência e qual a perda estimada por multas não capturadas? | `03_customer_behavior.sql` | ✅ |
 | 5 | Como a receita se comportou ao longo do tempo? Há meses com queda ou pico relevante? | `04_temporal_trends.sql` | ✅ |
-| 6 | Quais lojas têm melhor desempenho em receita e volume, e qual a diferença entre elas? | `05_segmentation.sql` | ✅ |
-| 7 | Qual a taxa de utilização do estoque por loja e categoria — há filmes sub-alugados em relação às cópias disponíveis? | `05_segmentation.sql` | ✅ |
+| 6 | Qual colaborador gerou mais receita e processou mais aluguéis no período? | `05_segmentation.sql` | ✅ |
+| 7 | Quais lojas têm melhor desempenho em receita e volume, e qual a diferença entre elas? | `05_segmentation.sql` | ✅ |
+| 8 | Qual a taxa de utilização do estoque por loja e categoria — há filmes sub-alugados em relação às cópias disponíveis? | `05_segmentation.sql` | ✅ |
 
 ---
 
@@ -68,6 +74,8 @@
 | Taxa de Utilização do Estoque (%) | Percentual de cópias que foram alugadas ao menos 1 vez | `COUNT(DISTINCT i.inventory_id alugado) * 100.0 / NULLIF(COUNT(DISTINCT i.inventory_id), 0)` |
 | LTV Simplificado do Cliente | Receita total gerada por cliente no período | `SUM(p.amount) GROUP BY c.customer_id` |
 | Receita por Categoria | Receita agrupada por gênero do filme | `SUM(p.amount) GROUP BY cat.name` |
+| Receita por Colaborador | Receita total processada por cada atendente | `SUM(p.amount) GROUP BY s.staff_id` |
+| Perda Estimada por Multas | Estimativa de receita não capturada em atrasos | `SUM(dias_atraso × (rental_rate / rental_duration))` |
 
 ---
 
@@ -75,8 +83,8 @@
 
 | Atributo | Detalhe |
 |---|---|
-| Nome | DVD Rental Database |
-| Fonte | PostgreSQL Sample Databases |
+| Nome | Sakila Database |
+| Fonte | MySQL Sample Databases (banco oficial de exemplo do MySQL) |
 | Período | Maio a Agosto de 2005 + Fevereiro de 2006 |
 | Cobertura | 2 lojas, 599 clientes, 1.000 filmes, 16.044 cópias físicas |
 | Volume | 14.596 aluguéis, 14.596 pagamentos |
@@ -90,8 +98,8 @@
 
 | Ferramenta | Versão | Uso no Projeto |
 |---|---|---|
-| PostgreSQL | 15+ | Banco de dados principal, execução de todas as queries |
-| pgAdmin 4 | 7+ | Interface de execução e visualização dos resultados |
+| MySQL | 8.0+ | Banco de dados principal, execução de todas as queries |
+| MySQL Workbench | 8.0+ | Interface de execução e visualização dos resultados |
 | Git/GitHub | — | Versionamento e publicação do projeto |
 
 **Técnicas SQL aplicadas:**
@@ -206,6 +214,12 @@ Cerca de 1.440 cópias físicas não registraram nenhum aluguel. A concentraçã
 **5. As duas lojas têm desempenho de receita semelhante, mas perfis de cliente diferentes**
 A diferença de receita total entre Loja 1 e Loja 2 é inferior a 5%. Contudo, a Loja 2 tem clientes com ticket médio 12% maior, enquanto a Loja 1 compensa com volume 15% superior de aluguéis — perfis operacionais distintos que demandam estratégias de estoque diferentes.
 
+**6. A equipe está concentrada em 2 colaboradores com desempenho próximo, mas um deles lidera em aluguéis premium**
+Com apenas 2 atendentes na rede, ambos processam volumes similares de aluguéis. Porém, o colaborador da Loja 2 tem ticket médio superior, refletindo o perfil da sua base de clientes — não necessariamente maior esforço de venda.
+
+**7. A perda estimada por multas não capturadas representa uma oportunidade de receita incremental relevante**
+Os aluguéis com devolução em atraso acumulam milhares de dias-extra sem cobrança registrada. Estimando a multa como a taxa diária proporcional ao `rental_rate`, a perda potencial supera $X.XXX no período — valor que poderia ser parcialmente recuperado com uma política de multa automatizada no sistema.**
+
 ---
 
 ## 🏁 Conclusão e Recomendações
@@ -248,37 +262,41 @@ Documentação completa em [data_dictionary.md](docs/data_dictionary.md).
 ## ▶️ Como Executar o Projeto
 
 **Pré-requisitos:**
-- PostgreSQL 13+ instalado
-- pgAdmin 4 ou qualquer cliente SQL compatível com PostgreSQL
-- Dataset DVD Rental carregado no banco (ver instruções abaixo)
+- MySQL 8.0+ instalado
+- MySQL Workbench 8.0+ ou qualquer client MySQL
+- Banco Sakila carregado (ver instruções abaixo)
 
 **Passo a passo:**
 
-1. Baixe o dataset oficial:
+1. Baixe o banco Sakila no site oficial do MySQL:
    ```
-   https://www.postgresqltutorial.com/postgresql-getting-started/postgresql-sample-database/
+   https://dev.mysql.com/doc/index-other.html
    ```
+   Faça o download de **sakila-db.zip**
 
-2. Restaure o banco de dados:
-   ```bash
-   pg_restore -U postgres -d dvdrental dvdrental.tar
+2. Importe o banco no MySQL Workbench:
+   ```sql
+   SOURCE /caminho/sakila-schema.sql;
+   SOURCE /caminho/sakila-data.sql;
+   USE sakila;
    ```
 
 3. Execute os arquivos SQL na ordem:
    ```
    sql/01_data_quality_check.sql   → auditoria de integridade
    sql/02_business_analysis.sql    → análise de receita e produto
-   sql/03_customer_behavior.sql    → clientes e inadimplência
+   sql/03_customer_behavior.sql    → clientes, inadimplência e perda por multas
    sql/04_temporal_trends.sql      → tendências temporais
-   sql/05_segmentation.sql         → lojas e estoque
+   sql/05_segmentation.sql         → equipe, lojas e estoque
    sql/06_summary_views.sql        → criar as views consolidadas
    ```
 
 4. Verifique a carga do banco:
    ```sql
-   SELECT schemaname, tablename, n_live_tup AS total_registros
-   FROM pg_stat_user_tables
-   ORDER BY n_live_tup DESC;
+   SELECT table_name, table_rows
+   FROM information_schema.tables
+   WHERE table_schema = 'sakila'
+   ORDER BY table_rows DESC;
    ```
 
 ---

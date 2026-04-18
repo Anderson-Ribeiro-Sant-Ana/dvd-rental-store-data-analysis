@@ -265,7 +265,81 @@ RESULTADO ESPERADO:
   - taxa_utilizacao_geral_pct da rede deve ficar em ~82% (18% parado)
 
 INTERPRETAÇÃO:
-  - Esta visão alimenta diretamente o Insight 5 do insights.md
   - A loja com maior ticket_medio + menor total_alugueis confirma perfil premium
   - A loja com menor taxa_utilizacao_geral_pct tem o problema de estoque mais severo
+*/
+
+
+-- ============================================================
+-- SEÇÃO 6: DESEMPENHO DA EQUIPE POR COLABORADOR
+-- Objetivo: Avaliar a contribuição de cada atendente para a
+--           receita da operação e volume de aluguéis processados
+-- Hipótese: Com 2 colaboradores, o desempenho deve ser próximo;
+--           diferenças refletem o perfil da loja, não do atendente
+-- ============================================================
+
+SELECT
+    s.staff_id,
+    CONCAT(s.first_name, ' ', s.last_name)              AS colaborador,
+    s.store_id                                           AS loja,
+    COUNT(DISTINCT r.rental_id)                          AS total_alugueis_processados,
+    COUNT(DISTINCT r.customer_id)                        AS clientes_atendidos,
+    ROUND(SUM(p.amount), 2)                              AS receita_gerada,
+    ROUND(AVG(p.amount), 2)                              AS ticket_medio,
+    -- Participação de cada colaborador na receita total da rede
+    ROUND(SUM(p.amount) * 100.0
+          / NULLIF(SUM(SUM(p.amount)) OVER (), 0), 2)    AS participacao_receita_pct,
+    -- Ranking por receita gerada
+    RANK() OVER (ORDER BY SUM(p.amount) DESC)            AS rank_receita,
+    -- Receita por cliente atendido — mede eficiência de relacionamento
+    ROUND(SUM(p.amount) / NULLIF(COUNT(DISTINCT r.customer_id), 0), 2) AS receita_por_cliente
+FROM staff s
+JOIN rental r  ON s.staff_id  = r.staff_id
+JOIN payment p ON r.rental_id = p.rental_id
+GROUP BY s.staff_id, s.first_name, s.last_name, s.store_id
+ORDER BY receita_gerada DESC;
+
+/*
+RESULTADO ESPERADO:
+  - 2 linhas, uma por colaborador
+  - participacao_receita_pct deve somar 100%
+  - Diferença de receita entre os dois deve refletir o perfil de cada loja
+  - ticket_medio do colaborador da Loja 2 deve ser maior (perfil premium da loja)
+
+INTERPRETAÇÃO:
+  - Diferença de receita entre colaboradores não implica diferença de desempenho
+    individual — cada um atende uma loja com perfil distinto de clientes
+  - receita_por_cliente é a métrica mais justa para comparação individual,
+    pois normaliza pelo tamanho da base atendida
+*/
+
+
+-- ============================================================
+-- SEÇÃO 7: EVOLUÇÃO MENSAL DA RECEITA POR COLABORADOR
+-- Objetivo: Verificar se há meses em que um colaborador supera
+--           o outro — pode indicar sazonalidade ou ausência pontual
+-- ============================================================
+
+SELECT
+    DATE_FORMAT(p.payment_date, '%Y-%m-01')             AS mes,
+    CONCAT(s.first_name, ' ', s.last_name)              AS colaborador,
+    s.store_id                                           AS loja,
+    COUNT(DISTINCT r.rental_id)                          AS total_alugueis,
+    ROUND(SUM(p.amount), 2)                              AS receita_total,
+    RANK() OVER (
+        PARTITION BY DATE_FORMAT(p.payment_date, '%Y-%m-01')
+        ORDER BY SUM(p.amount) DESC
+    )                                                    AS rank_no_mes
+FROM staff s
+JOIN rental r  ON s.staff_id  = r.staff_id
+JOIN payment p ON r.rental_id = p.rental_id
+GROUP BY DATE_FORMAT(p.payment_date, '%Y-%m-01'), s.staff_id, s.first_name, s.last_name, s.store_id
+ORDER BY mes, rank_no_mes;
+
+/*
+RESULTADO ESPERADO:
+  - 2 linhas por mês (5 meses = até 10 linhas)
+  - rank_no_mes = 1 indica o colaborador líder naquele mês
+  - Se o mesmo colaborador lidera todos os meses: padrão consistente de loja
+  - Se há alternância: pode indicar sazonalidade ou cobertura de ausências
 */

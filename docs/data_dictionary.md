@@ -1,6 +1,7 @@
-# Dicionário de Dados — DVD Rental Store
+# Dicionário de Dados — Sakila DVD Store
 
-> **Fonte:** PostgreSQL Sample Database — DVD Rental  
+> **Fonte:** MySQL Sample Database — Sakila  
+> **Origem do desafio:** MyGreatLearning — trilha de formação em análise de dados com SQL  
 > **Período:** Maio a Agosto de 2005 + Fevereiro de 2006  
 > **Granularidade:** Transação individual de aluguel  
 > **Total de tabelas:** 15 tabelas de dados + 1 view  
@@ -157,10 +158,10 @@ customer → rental → inventory → film → film_category → category
 | `last_name` | VARCHAR(45) | Não | SMITH | Sobrenome | Armazenado em maiúsculas |
 | `email` | VARCHAR(50) | Sim | mary.smith@sakilacustomer.org | E-mail do cliente | Domínio fictício; não deve ser usado para contato |
 | `address_id` | INT (FK) | Não | 5 | Endereço do cliente | Referencia `address.address_id` |
-| `activebool` | BOOLEAN | Não | true | Status ativo/inativo como booleano | Campo mais confiável que `active` |
+| `activebool` | BOOLEAN | Não | true | Status ativo/inativo como booleano | Presente no PostgreSQL DVD Rental; no Sakila/MySQL usar `active` |
 | `create_date` | DATE | Não | 2006-02-14 | Data de cadastro do cliente | |
 | `last_update` | TIMESTAMP | Sim | — | Campo de controle interno | |
-| `active` | INT | Sim | 1 | Status ativo/inativo como inteiro (1=ativo, 0=inativo) | Usar `activebool` como referência primária |
+| `active` | TINYINT | Sim | 1 | Status ativo/inativo (1=ativo, 0=inativo) | Campo principal no MySQL/Sakila — usado em `WHERE active = 1` |
 
 ### Tabelas de Endereço (`address`, `city`, `country`)
 
@@ -237,6 +238,8 @@ Utilizadas apenas para contextualização geográfica. Não fazem parte das aná
 | `taxa_utilizacao_estoque_pct` | `COUNT(DISTINCT r.inventory_id) * 100.0 / NULLIF(COUNT(DISTINCT i.inventory_id), 0)` | % de cópias físicas com ao menos 1 aluguel no período | `05_segmentation.sql` |
 | `crescimento_mom_pct` | `(receita_mes - LAG(receita_mes) OVER (ORDER BY mes)) * 100.0 / NULLIF(LAG(receita_mes) OVER (ORDER BY mes), 0)` | Variação percentual da receita mês a mês | `04_temporal_trends.sql` |
 | `receita_acumulada` | `SUM(receita_mes) OVER (ORDER BY mes ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)` | Receita total acumulada ao longo do tempo | `04_temporal_trends.sql` |
+| `receita_colaborador` | `SUM(p.amount) GROUP BY s.staff_id` | Receita total processada por cada atendente no período | `05_segmentation.sql` |
+| `perda_estimada_multa` | `SUM(GREATEST(0, DATEDIFF(return_date,rental_date) - rental_duration) * (rental_rate / rental_duration))` | Estimativa de receita não capturada por atrasos — metodologia detalhada em `methodology.md` | `03_customer_behavior.sql` |
 
 ---
 
@@ -289,6 +292,7 @@ ROUND(valor * 100.0 / NULLIF(total, 0), 2)
 
 | Fonte | URL | Tipo |
 |---|---|---|
-| PostgreSQL Sample Databases | https://www.postgresqltutorial.com/postgresql-getting-started/postgresql-sample-database/ | Dataset original |
-| PostgreSQL 15 Documentation | https://www.postgresql.org/docs/15/ | Referência técnica SQL |
-| Schema ERD | Disponível na documentação oficial do PostgreSQL Tutorial | Diagrama de entidade-relacionamento |
+| MySQL Sample Databases (Sakila) | https://dev.mysql.com/doc/index-other.html | Dataset original |
+| MySQL 8.0 Documentation | https://dev.mysql.com/doc/refman/8.0/en/ | Referência técnica SQL |
+| Sakila ERD | https://dev.mysql.com/doc/sakila/en/sakila-structure.html | Diagrama de entidade-relacionamento |
+| MyGreatLearning | https://www.mygreatlearning.com | Plataforma de origem do desafio |

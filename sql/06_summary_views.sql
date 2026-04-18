@@ -301,21 +301,97 @@ ORDER BY et.store_id, taxa_utilizacao_pct DESC;
 
 
 -- ============================================================
+-- VIEW 7: vw_desempenho_equipe
+-- Fonte: 05_segmentation.sql — Seção 6
+-- Uso: Comparativo de desempenho entre os colaboradores da rede
+-- ============================================================
+
+DROP VIEW IF EXISTS vw_desempenho_equipe;
+
+CREATE VIEW vw_desempenho_equipe AS
+SELECT
+    s.staff_id,
+    CONCAT(s.first_name, ' ', s.last_name)              AS colaborador,
+    s.store_id                                           AS loja,
+    COUNT(DISTINCT r.rental_id)                          AS total_alugueis_processados,
+    COUNT(DISTINCT r.customer_id)                        AS clientes_atendidos,
+    ROUND(SUM(p.amount), 2)                              AS receita_gerada,
+    ROUND(AVG(p.amount), 2)                              AS ticket_medio,
+    ROUND(SUM(p.amount) * 100.0
+          / NULLIF(SUM(SUM(p.amount)) OVER (), 0), 2)    AS participacao_receita_pct,
+    RANK() OVER (ORDER BY SUM(p.amount) DESC)            AS rank_receita,
+    ROUND(SUM(p.amount)
+          / NULLIF(COUNT(DISTINCT r.customer_id), 0), 2) AS receita_por_cliente
+FROM staff s
+JOIN rental r  ON s.staff_id  = r.staff_id
+JOIN payment p ON r.rental_id = p.rental_id
+GROUP BY s.staff_id, s.first_name, s.last_name, s.store_id;
+
+-- Verificação: SELECT * FROM vw_desempenho_equipe;
+
+
+-- ============================================================
+-- VIEW 8: vw_perda_estimada_multas
+-- Fonte: 03_customer_behavior.sql — Seções 6 e 7
+-- Uso: Estimativa de receita não capturada por atrasos na devolução
+-- ============================================================
+
+DROP VIEW IF EXISTS vw_perda_estimada_multas;
+
+CREATE VIEW vw_perda_estimada_multas AS
+SELECT
+    cat.name                                                         AS categoria,
+    COUNT(r.rental_id)                                               AS total_alugueis_atrasados,
+    SUM(GREATEST(0, DATEDIFF(r.return_date, r.rental_date)
+        - f.rental_duration))                                        AS total_dias_atraso,
+    ROUND(SUM(
+        GREATEST(0, DATEDIFF(r.return_date, r.rental_date) - f.rental_duration)
+        * (f.rental_rate / NULLIF(f.rental_duration, 0))
+    ), 2)                                                            AS perda_estimada,
+    ROUND(SUM(
+        GREATEST(0, DATEDIFF(r.return_date, r.rental_date) - f.rental_duration)
+        * (f.rental_rate / NULLIF(f.rental_duration, 0))
+    ) * 100.0 / NULLIF(SUM(SUM(
+        GREATEST(0, DATEDIFF(r.return_date, r.rental_date) - f.rental_duration)
+        * (f.rental_rate / NULLIF(f.rental_duration, 0))
+    )) OVER (), 0), 2)                                               AS participacao_perda_pct,
+    RANK() OVER (
+        ORDER BY SUM(
+            GREATEST(0, DATEDIFF(r.return_date, r.rental_date) - f.rental_duration)
+            * (f.rental_rate / NULLIF(f.rental_duration, 0))
+        ) DESC
+    )                                                                AS rank_perda
+FROM rental r
+JOIN inventory i      ON r.inventory_id = i.inventory_id
+JOIN film f           ON i.film_id      = f.film_id
+JOIN film_category fc ON f.film_id      = fc.film_id
+JOIN category cat     ON fc.category_id = cat.category_id
+WHERE r.return_date IS NOT NULL
+  AND DATEDIFF(r.return_date, r.rental_date) > f.rental_duration
+GROUP BY cat.name;
+
+-- Verificação: SELECT * FROM vw_perda_estimada_multas ORDER BY rank_perda;
+
+
+-- ============================================================
 -- CONSULTA FINAL: CONFIRMAR TODAS AS VIEWS CRIADAS
+-- MySQL usa information_schema.views no lugar de pg_views
 -- ============================================================
 
 SELECT
-    viewname                        AS view,
-    'Criada com sucesso'            AS status
-FROM pg_views
-WHERE schemaname = 'public'
-  AND viewname LIKE 'vw_%'
-ORDER BY viewname;
+    table_name              AS view_name,
+    'Criada com sucesso'    AS status
+FROM information_schema.views
+WHERE table_schema = DATABASE()
+  AND table_name LIKE 'vw_%'
+ORDER BY table_name;
 
 /*
 RESULTADO ESPERADO:
-  6 linhas com as views:
+  8 linhas com as views:
+  - vw_desempenho_equipe
   - vw_desempenho_lojas
+  - vw_perda_estimada_multas
   - vw_receita_por_categoria
   - vw_segmentacao_clientes
   - vw_tendencia_mensal
